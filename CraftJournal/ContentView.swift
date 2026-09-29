@@ -17,10 +17,13 @@ struct ContentView: View {
     
     @State private var showingAddEntry = false
     
+    //Search
+    @State private var searchText = ""
+    
     var body: some View {
         NavigationStack {
             List {
-                ForEach(entries) { entry in
+                ForEach(filteredEntries) { entry in
                     NavigationLink {
                         EntryDetailView(entry: entry)
                     } label: {
@@ -28,8 +31,38 @@ struct ContentView: View {
                     }
                 }
                 .onDelete(perform: deleteEntries)
+                if entries.isEmpty {
+
+                    ContentUnavailableView(
+                        "No Entries",
+                        systemImage: "book.closed",
+                        description: Text("Start your craft journal by adding an entry.")
+                    )
+
+                } else {
+
+                    List {
+                        ForEach(entries) { entry in
+                            // Your existing EntryRow
+                        }
+                        .onDelete(perform: deleteEntries)
+                    }
+                }
             }
-            .navigationTitle("Craft Journal")
+            
+            
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack {
+                        Text("Craft Journal")
+                            .font(.headline)
+
+                        Text("\(entries.count) \(entries.count == 1 ? "entry" : "entries")")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -43,6 +76,11 @@ struct ContentView: View {
                 AddEntryView()
                     .environment(\.managedObjectContext, viewContext)
             }
+            
+            .searchable(
+                text: $searchText,
+                prompt: "Search entries"
+            )
         }
     }
     
@@ -54,10 +92,23 @@ struct ContentView: View {
             print("Could not delete: \(error)")
         }
     }
+    
+    private var filteredEntries: [CraftEntry] {
+
+        if searchText.isEmpty {
+            return Array(entries)
+        }
+
+        return entries.filter { entry in
+            (entry.title ?? "")
+                .localizedCaseInsensitiveContains(searchText)
+        }
+    }
 }
 
 struct EntryRow: View {
     @ObservedObject var entry: CraftEntry
+    
     var body: some View {
         HStack {
             if let data = entry.photo, let uiImage = UIImage(data: data) {
@@ -77,7 +128,15 @@ struct EntryRow: View {
                 Text(entry.craftType ?? "")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                
+                if let location = entry.location, !location.isEmpty {
+                    Text(location)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
             }
+            
         }
     }
 }

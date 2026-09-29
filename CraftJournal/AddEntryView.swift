@@ -25,6 +25,11 @@ struct AddEntryView: View {
 
     // Photo Library
     @State private var selectedPhoto: PhotosPickerItem?
+    
+    // Location
+    @State private var location = ""
+    
+    
 
     var body: some View {
 
@@ -79,11 +84,8 @@ struct AddEntryView: View {
                     }
                 }
 
-                TextField(
-                    "Notes",
-                    text: $notes,
-                    axis: .vertical
-                )
+                TextField("Location", text: $location)
+                TextField("Notes", text: $notes, axis: .vertical)
             }
 
             .navigationTitle("New Entry")
@@ -135,12 +137,11 @@ struct AddEntryView: View {
         entry.title = title
         entry.craftType = craftType
         entry.date = Date()
+        entry.location = location
         entry.notes = notes
 
-        // Save either camera photo or library photo
-        entry.photo = image?.jpegData(
-            compressionQuality: 0.7
-        )
+        
+        entry.photo = image?.jpegData(compressionQuality: 0.7)
 
         do {
             try viewContext.save()
