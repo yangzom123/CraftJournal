@@ -5,65 +5,79 @@
 //  Created by iMac14 on 9/29/26.
 //
 
+
 import SwiftUI
 import CoreData
+import UIKit
 
 struct ContentView: View {
+
     @Environment(\.managedObjectContext) private var viewContext
+
     @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \CraftEntry.date, ascending: false)],
-        animation: .default)
+        sortDescriptors: [
+            NSSortDescriptor(
+                keyPath: \CraftEntry.date,
+                ascending: false
+            )
+        ],
+        animation: .default
+    )
     private var entries: FetchedResults<CraftEntry>
-    
+
     @State private var showingAddEntry = false
-    
-    //Search
+
+    // Search
     @State private var searchText = ""
-    
+
     var body: some View {
         NavigationStack {
             List {
-                ForEach(filteredEntries) { entry in
-                    NavigationLink {
-                        EntryDetailView(entry: entry)
-                    } label: {
-                        EntryRow(entry: entry)
-                    }
-                }
-                .onDelete(perform: deleteEntries)
-                if entries.isEmpty {
 
+                // M3: Empty journal message
+                if entries.isEmpty {
                     ContentUnavailableView(
                         "No Entries",
                         systemImage: "book.closed",
-                        description: Text("Start your craft journal by adding an entry.")
+                        description: Text(
+                            "Start your craft journal by adding an entry."
+                        )
                     )
 
-                } else {
+                // C2: No search results
+                } else if filteredEntries.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
 
-                    List {
-                        ForEach(entries) { entry in
-                            // Your existing EntryRow
+                // Display journal entries
+                } else {
+                    ForEach(filteredEntries) { entry in
+                        NavigationLink {
+                            EntryDetailView(entry: entry)
+                        } label: {
+                            EntryRow(entry: entry)
                         }
-                        .onDelete(perform: deleteEntries)
                     }
+                    .onDelete(perform: deleteEntries)
                 }
             }
-            
-            
+            .navigationTitle("Craft Journal")
+
+            // M3: Entry count
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     VStack {
                         Text("Craft Journal")
                             .font(.headline)
 
-                        Text("\(entries.count) \(entries.count == 1 ? "entry" : "entries")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            "\(entries.count) \(entries.count == 1 ? "entry" : "entries")"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
-            }
-            .toolbar {
+
+                // Add entry button
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showingAddEntry = true
@@ -72,27 +86,42 @@ struct ContentView: View {
                     }
                 }
             }
+
+            // Display AddEntryView
             .sheet(isPresented: $showingAddEntry) {
                 AddEntryView()
-                    .environment(\.managedObjectContext, viewContext)
+                    .environment(
+                        \.managedObjectContext,
+                        viewContext
+                    )
             }
-            
+
+            // C2: Search entries by title
             .searchable(
                 text: $searchText,
                 prompt: "Search entries"
             )
         }
     }
-    
+
+    // Delete entries
     private func deleteEntries(offsets: IndexSet) {
-        offsets.map { entries[$0] }.forEach(viewContext.delete)
+
+        // Map visible rows to their actual Core Data objects.
+        let entriesToDelete = offsets.map {
+            filteredEntries[$0]
+        }
+
+        entriesToDelete.forEach(viewContext.delete)
+
         do {
             try viewContext.save()
         } catch {
             print("Could not delete: \(error)")
         }
     }
-    
+
+    // C2: Filter entries by title
     private var filteredEntries: [CraftEntry] {
 
         if searchText.isEmpty {
@@ -106,42 +135,86 @@ struct ContentView: View {
     }
 }
 
+// Journal row
 struct EntryRow: View {
+
     @ObservedObject var entry: CraftEntry
-    
+
     var body: some View {
-        HStack {
-            if let data = entry.photo, let uiImage = UIImage(data: data) {
+        HStack(spacing: 12) {
+
+            // Display saved photo
+            if let data = entry.photo,
+               let uiImage = UIImage(data: data) {
+
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 60, height: 60)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 8)
+                    )
+                    .clipped()
+
             } else {
                 Image(systemName: "photo")
+                    .font(.title2)
                     .frame(width: 60, height: 60)
                     .foregroundStyle(.secondary)
             }
-            VStack(alignment: .leading) {
+
+            // Entry information
+            VStack(alignment: .leading, spacing: 4) {
+
                 Text(entry.title ?? "Untitled")
                     .font(.headline)
+
                 Text(entry.craftType ?? "")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                
-                if let location = entry.location, !location.isEmpty {
+
+                // M1: Display location
+                if let location = entry.location,
+                   !location.isEmpty {
+
                     Text(location)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                
             }
-            
+
+            Spacer()
+
+            // C4: Favourite button
+            Button {
+                entry.isFavourite.toggle()
+
+                do {
+                    try entry.managedObjectContext?.save()
+                } catch {
+                    print("Could not save favorite: \(error)")
+                }
+
+            } label: {
+                Image(
+                    systemName: entry.isFavourite
+                        ? "star.fill"
+                        : "star"
+                )
+                .foregroundStyle(
+                    entry.isFavourite ? .yellow : .secondary
+                )
+            }
+            .buttonStyle(.plain)
         }
+        .padding(.vertical, 4)
     }
 }
+
 #Preview {
     ContentView()
-        .environment(\.managedObjectContext,
-PersistenceController.preview.container.viewContext)
+        .environment(
+            \.managedObjectContext,
+            PersistenceController.preview.container.viewContext
+        )
 }
